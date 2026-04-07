@@ -1,0 +1,40 @@
+export const theme = {
+  light: {
+    bg: "#F8F9FA",
+    card: "#FFFFFF",
+    primary: "#E50914",
+    secondary: "#FF6B6B",
+    accent: "#F59E0B",
+    success: "#10B981",
+    warning: "#FBBF24",
+    error: "#EF4444",
+    info: "#3B82F6",
+    text: "#111827",
+    sub: "#4B5563",
+    muted: "#9CA3AF",
+    border: "#E5E7EB",
+    gradientStart: "#9333EA",
+    gradientEnd: "#EC4899",
+  },
+  dark: {
+    bg: "#0A0A0A",
+    card: "#1F1F23",
+    primary: "#E50914",
+    secondary: "#FF6B6B",
+    accent: "#F59E0B",
+    success: "#10B981",
+    warning: "#FBBF24",
+    error: "#EF4444",
+    info: "#3B82F6",
+    text: "#FFFFFF",
+    sub: "#A1A1AA",
+    muted: "#6B7280",
+    border: "#2C2C2E",
+    gradientStart: "#9333EA",
+    gradientEnd: "#EC4899",
+  },
+};
+
+// Default export for backward compatibility if needed, 
+// but we should move towards usAppColors hook
+export const colors = theme.dark; 
