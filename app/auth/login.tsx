@@ -3,6 +3,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
   Image,
   Keyboard,
@@ -15,6 +16,9 @@ import {
   TouchableWithoutFeedback,
   View,
 } from "react-native";
+import { authService } from "@/services/authService";
+import Toast from "react-native-toast-message";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Login() {
   const router = useRouter();
@@ -22,18 +26,64 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ email và mật khẩu");
+      Toast.show({
+        type: "error",
+        text1: "Lỗi",
+        text2: "Vui lòng nhập đầy đủ thông tin",
+      });
       return;
     }
 
-    // Demo logic – sau này thay bằng API
-    if (email === "test@gmail.com" && password === "123456") {
+    setIsLoading(true);
+    try {
+      const data = await authService.login({ 
+        email: email.trim(), 
+        password: password.trim() 
+      });
+
+      // authService returns directly the data
+      const { token, fullName, role, email: userEmail } = data;
+      
+      await AsyncStorage.setItem("@user_token", token);
+      await AsyncStorage.setItem("@user_info", JSON.stringify({ 
+        fullName, 
+        role, 
+        email: userEmail 
+      }));
+
+      Toast.show({
+        type: "success",
+        text1: "Thành công",
+        text2: `Chào mừng ${fullName} trở lại!`,
+      });
+
       router.replace("/(tabs)");
-    } else {
-      Alert.alert("Đăng nhập thất bại", "Email hoặc mật khẩu không đúng");
+    } catch (error: any) {
+      console.error("Login Error:", error);
+      
+      let errorMessage = "Đăng nhập thất bại";
+      
+      if (error.response) {
+        errorMessage = error.response.data?.message || errorMessage;
+      } else if (error.request) {
+        errorMessage = "Không thể kết nối tới máy chủ. Vui lòng kiểm tra IP API.";
+      } else {
+        errorMessage = error.message;
+      }
+
+      Toast.show({
+        type: "error",
+        text1: "Lỗi",
+        text2: errorMessage,
+        position: "top",
+        topOffset: 60,
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -99,7 +149,11 @@ export default function Login() {
                 colors={["#E50914", "#B20710"]}
                 style={styles.loginBtn}
               >
-                <Text style={styles.loginText}>Đăng nhập</Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.loginText}>Đăng nhập</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 

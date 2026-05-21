@@ -14,7 +14,10 @@ import {
   TouchableOpacity,
   TouchableWithoutFeedback,
   View,
+  ActivityIndicator,
 } from "react-native";
+import { authService } from "@/services/authService";
+import Toast from "react-native-toast-message";
 
 export default function Register() {
   const router = useRouter();
@@ -23,31 +26,81 @@ export default function Register() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleRegister = () => {
-    if (!name || !email || !password || !confirmPassword) {
-      Alert.alert("Lỗi", "Vui lòng nhập đầy đủ thông tin");
+  const handleRegister = async () => {
+    if (!name || !email || !password || !confirmPassword || !phone) {
+      Toast.show({
+        type: "error",
+        text1: "Lỗi",
+        text2: "Vui lòng nhập đầy đủ thông tin",
+      });
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("Lỗi", "Mật khẩu phải có ít nhất 6 ký tự");
+      Toast.show({
+        type: "error",
+        text1: "Lỗi",
+        text2: "Mật khẩu phải có ít nhất 6 ký tự",
+      });
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Lỗi", "Mật khẩu xác nhận không khớp");
+      Toast.show({
+        type: "error",
+        text1: "Lỗi",
+        text2: "Mật khẩu xác nhận không khớp",
+      });
       return;
     }
 
-    Alert.alert("Thành công", "Đăng ký tài khoản thành công", [
-      {
-        text: "Đăng nhập",
-        onPress: () => router.replace("/auth/login"),
-      },
-    ]);
+    setIsLoading(true);
+    try {
+      await authService.register({
+        fullName: name,
+        email: email,
+        password: password,
+        phone: phone,
+      });
+
+      Toast.show({
+        type: "success",
+        text1: "Thành công",
+        text2: "Đăng ký tài khoản thành công!",
+      });
+      
+      // Chuyển hướng về login sau 1.5s để người dùng kịp thấy Toast
+      setTimeout(() => {
+        router.replace("/auth/login");
+      }, 1500);
+    } catch (error: any) {
+      console.error("Register Error:", error);
+      
+      let errorMessage = "Đăng ký thất bại";
+      
+      if (error.response) {
+        // Lỗi từ phía Server (Backend trả về)
+        errorMessage = error.response.data?.message || errorMessage;
+      } else if (error.request) {
+        // Lỗi không kết nối được tới Server (Network error)
+        errorMessage = "Không thể kết nối tới máy chủ. Vui lòng kiểm tra mạng hoặc địa chỉ IP API.";
+      } else {
+        errorMessage = error.message;
+      }
+
+      Toast.show({
+        type: "error",
+        text1: "Lỗi",
+        text2: errorMessage,
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -74,6 +127,18 @@ export default function Register() {
                 style={styles.input}
                 value={name}
                 onChangeText={setName}
+              />
+            </View>
+
+            <View style={styles.inputWrapper}>
+              <Ionicons name="call-outline" size={20} color="#9CA3AF" />
+              <TextInput
+                placeholder="Số điện thoại"
+                placeholderTextColor="#9CA3AF"
+                style={styles.input}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
               />
             </View>
 
@@ -133,7 +198,11 @@ export default function Register() {
                 colors={["#E50914", "#B20710"]}
                 style={styles.registerBtn}
               >
-                <Text style={styles.registerText}>Đăng ký</Text>
+                {isLoading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.registerText}>Đăng ký</Text>
+                )}
               </LinearGradient>
             </TouchableOpacity>
 

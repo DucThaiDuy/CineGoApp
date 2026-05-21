@@ -15,6 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export default function Profile() {
   const router = useRouter();
@@ -42,9 +43,15 @@ export default function Profile() {
     { key: "help", title: "Hỗ trợ", icon: "help-circle-outline" },
   ];
 
-  const handleLogout = () => {
-    setConfirmVisible(false);
-    router.replace("/auth/login" as any);
+  const handleLogout = async () => {
+    try {
+      setConfirmVisible(false);
+      // Xóa sạch dấu vết đăng nhập
+      await AsyncStorage.multiRemove(["@user_token", "@user_info"]);
+      router.replace("/auth/login" as any);
+    } catch (error) {
+      console.error("Logout Error:", error);
+    }
   };
 
   const renderHeader = () => (

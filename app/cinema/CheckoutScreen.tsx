@@ -14,35 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Toast, { ToastConfig } from "react-native-toast-message";
-
-// 1. Tạo custom toast
-const toastConfig: ToastConfig = {
-  success: ({ text1, text2 }: any) => (
-    <LinearGradient
-      colors={[colors.text, colors.text]}
-      style={{
-        padding: 12,
-        borderRadius: 8,
-        marginHorizontal: 16,
-        flexDirection: "row",
-        alignItems: "center",
-      }}
-    >
-      <Ionicons
-        name="checkmark-circle-outline"
-        size={24}
-        color={colors.success}
-      />
-      <View style={{ marginLeft: 12 }}>
-        <Text style={{ color: colors.success, fontWeight: "700" }}>
-          {text1}
-        </Text>
-        {text2 ? <Text style={{ color: colors.sub }}>{text2}</Text> : null}
-      </View>
-    </LinearGradient>
-  ),
-};
+import Toast from "react-native-toast-message";
 
 type PaymentMethod = "MoMo" | "ZaloPay" | "VNPay" | "ATM/Visa";
 
@@ -233,7 +205,6 @@ export default function CheckoutScreen() {
           </Text>
         </LinearGradient>
       </TouchableOpacity>
-      <Toast config={toastConfig} />
     </View>
   );
 }
