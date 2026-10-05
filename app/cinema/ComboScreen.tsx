@@ -5,6 +5,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import { useEffect, useMemo, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ImageBackground,
   ScrollView,
@@ -83,6 +84,7 @@ const singleItems = [
 ];
 
 export default function ComboScreen() {
+  const insets = useSafeAreaInsets();
   const [comboList, setComboList] = useState<typeof combos>([]);
   const [selectedCombos, setSelectedCombos] = useState<SelectedCombo[]>([]);
 
@@ -249,7 +251,7 @@ export default function ComboScreen() {
           ))}
         </View>
       </ScrollView>
-      <View style={styles.footer}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom ? insets.bottom + 12 : 16 }]}>
         <View>
           <Text style={styles.footerText}>Combo đã chọn ({totalQty})</Text>
 

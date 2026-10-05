@@ -2,6 +2,7 @@ import BookingHeader from "@/components/BookingHeader";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { useRef, useState } from "react";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Animated,
   ImageBackground,
@@ -32,6 +33,7 @@ const ways = [
 ];
 
 export default function SeatScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
   const movie = MOVIES.find((m) => m.id === id) || MOVIES[0];
@@ -174,7 +176,7 @@ export default function SeatScreen() {
       </View>
 
       {/* Bottom */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom ? insets.bottom + 12 : 16 }]}>
         {/* Ghế đã chọn */}
         <Text style={styles.seatText}>
           Ghế: {selectedSeats.length ? selectedSeats.join(", ") : "Chưa chọn"}

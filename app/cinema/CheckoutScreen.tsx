@@ -15,10 +15,12 @@ import {
   View,
 } from "react-native";
 import Toast from "react-native-toast-message";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type PaymentMethod = "MoMo" | "ZaloPay" | "VNPay" | "ATM/Visa";
 
 export default function CheckoutScreen() {
+  const insets = useSafeAreaInsets();
   const [selectedPayment, setSelectedPayment] = useState<PaymentMethod>("MoMo");
 
   // thông báo thành công
@@ -193,7 +195,7 @@ export default function CheckoutScreen() {
       </ScrollView>
 
       {/* NÚT XÁC NHẬN THANH TOÁN */}
-      <TouchableOpacity style={{ margin: 16 }} onPress={handlePayment}>
+      <TouchableOpacity style={{ margin: 16, marginBottom: insets.bottom ? insets.bottom + 12 : 16 }} onPress={handlePayment}>
         <LinearGradient
           colors={[colors.primary, colors.primary]}
           style={{ padding: 12, borderRadius: 8 }}

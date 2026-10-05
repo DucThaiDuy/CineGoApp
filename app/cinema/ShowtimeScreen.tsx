@@ -13,7 +13,10 @@ import {
   View,
 } from "react-native";
 
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+
 export default function ShowtimeScreen() {
+  const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState("Hôm nay");
   const [selectedFormat, setSelectedFormat] = useState("2D");
   const [selectedShowtime, setSelectedShowtime] = useState<string | null>(null);
@@ -144,7 +147,7 @@ export default function ShowtimeScreen() {
       </ScrollView>
 
       {/* CTA */}
-      <View style={styles.bottomBar}>
+      <View style={[styles.bottomBar, { paddingBottom: insets.bottom ? insets.bottom + 12 : 16 }]}>
         <TouchableOpacity
           style={[styles.nextBtn, !selectedShowtime && styles.nextBtnDisabled]}
           disabled={!selectedShowtime}

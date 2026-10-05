@@ -20,6 +20,8 @@ import Animated, { FadeInDown, FadeInRight, Layout } from "react-native-reanimat
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { getOfflineTickets, saveTicketsOffline } from "../../utils/storage";
 import Toast from "react-native-toast-message";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import api from "@/utils/api";
 
 
 const { width } = Dimensions.get("window");
@@ -41,56 +43,6 @@ interface TicketType {
   bookingDate: string;
 }
 
-const mockTickets: TicketType[] = [
-  {
-    id: "1",
-    orderId: "CG-2023-9981",
-    title: "Oppenheimer",
-    poster: "https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
-    cinema: "CineGo Gò Vấp",
-    location: "Sảnh 1 - Tầng 3",
-    date: "20/12/2025",
-    time: "19:30",
-    hall: "Hall 05",
-    seat: ["A10", "A11"],
-    price: 240000,
-    runtime: "180 min",
-    status: "upcoming",
-    bookingDate: "2023-11-15",
-  },
-  {
-    id: "2",
-    orderId: "CG-2023-4421",
-    title: "Dune: Part Two",
-    poster: "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-    cinema: "CineGo Thủ Đức",
-    location: "Sảnh CHILL - Tầng 1",
-    date: "10/12/2025",
-    time: "20:00",
-    hall: "Hall 02",
-    seat: ["B15"],
-    price: 150000,
-    runtime: "166 min",
-    status: "used",
-    bookingDate: "2023-11-10",
-  },
-  {
-    id: "3",
-    orderId: "CG-2023-8812",
-    title: "Detective Conan",
-    poster: "https://assetscdn1.paytm.com/images/cinema/_DETECTIVE-CONAN---Gallery-e2363970-8161-11ef-9b0f-4fef860dce54.jpg",
-    cinema: "CineGo Tân Bình",
-    location: "Sảnh 2 - Tầng 4",
-    date: "15/12/2025",
-    time: "14:30",
-    hall: "Hall 01",
-    seat: ["G12", "G13"],
-    price: 180000,
-    runtime: "110 min",
-    status: "upcoming",
-    bookingDate: "2023-11-20",
-  },
-];
 
 const TicketTab = ({
   active,
@@ -133,19 +85,44 @@ export default function MyTicket() {
         setTickets(offlineData);
       }
 
-      // 2. Simulate API fetch
+      // 2. Gọi API thực tế
       try {
-        // In a real app, you would fetch from your Spring Boot API here
-        // const response = await fetch('YOUR_API_URL');
-        // const data = await response.json();
-        
-        // Simulating a successful fetch of mock data
-        const data = mockTickets; 
-        
-        setTickets(data);
-        await saveTicketsOffline(data);
+        const token = await AsyncStorage.getItem("@user_token");
+        if (!token) {
+          setIsOffline(true);
+          return;
+        }
+
+        // Thay vì gọi /api/admin/... (dành cho admin), ta sẽ gọi API dành riêng cho user
+        // Chú ý: Cần tạo UserBookingController ở Backend nhé (mình hướng dẫn bên dưới)
+        const response = await api.get(`/bookings/my-tickets`);
+        const apiData = response.data.data;
+
+        // Map dữ liệu từ backend về format của TicketType trên App
+        const mappedTickets: TicketType[] = apiData.map((item: any) => ({
+          id: item.id.toString(),
+          orderId: item.bookingCode,
+          title: item.movieName || "Movie", // Tuỳ thuộc backend trả về
+          poster: item.poster || "https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg", 
+          cinema: "CineGo",
+          location: "Rạp chiếu",
+          date: item.createdAt.substring(0, 10),
+          time: item.createdAt.substring(11, 16),
+          hall: "Sảnh",
+          seat: item.seats?.map((s: any) => s.seatCode) || [],
+          price: item.totalAmount,
+          runtime: "N/A",
+          status: item.status === "USED" ? "used" : "upcoming",
+          bookingDate: item.createdAt,
+        }));
+
+        setTickets(mappedTickets);
+        await saveTicketsOffline(mappedTickets);
         setIsOffline(false);
       } catch (error) {
+        console.error("Fetch tickets error:", error);
+        console.log("Offline mode: Using cached tickets.");
+        setIsOffline(true);
         console.log("Offline mode: Using cached tickets.");
         setIsOffline(true);
         Toast.show({
