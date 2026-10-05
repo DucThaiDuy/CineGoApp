@@ -41,6 +41,7 @@ interface TicketType {
   runtime: string;
   status: "upcoming" | "used";
   bookingDate: string;
+  qrToken?: string;
 }
 
 
@@ -114,6 +115,7 @@ export default function MyTicket() {
           runtime: "N/A",
           status: item.status === "USED" ? "used" : "upcoming",
           bookingDate: item.createdAt,
+          qrToken: item.seats?.[0]?.token || item.bookingCode, // Lấy token thật từ ghế đầu tiên
         }));
 
         setTickets(mappedTickets);
@@ -316,7 +318,7 @@ export default function MyTicket() {
                 >
                   <View style={styles.zoomedQRWrapper}>
                     <QRCode
-                      value={selectedTicket.orderId}
+                      value={selectedTicket.qrToken || selectedTicket.orderId}
                       size={width * 0.7}
                       color="#000"
                     />
@@ -382,7 +384,7 @@ export default function MyTicket() {
                          style={styles.qrContainer}
                       >
                         <QRCode
-                          value={selectedTicket.orderId}
+                          value={selectedTicket.qrToken || selectedTicket.orderId}
                           size={140}
                           backgroundColor="transparent"
                           color="#000"
