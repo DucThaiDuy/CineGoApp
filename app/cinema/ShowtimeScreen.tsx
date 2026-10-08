@@ -13,30 +13,98 @@ import {
   View,
 } from "react-native";
 
+import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function ShowtimeScreen() {
   const insets = useSafeAreaInsets();
-  const [selectedDate, setSelectedDate] = useState("Hôm nay");
-  const [selectedFormat, setSelectedFormat] = useState("2D");
-  const [selectedShowtime, setSelectedShowtime] = useState<string | null>(null);
+  const { id, cinemaId, cinemaName, cinemaAddress } = useLocalSearchParams<{ id: string, cinemaId: string, cinemaName: string, cinemaAddress: string }>();
+  const [movie, setMovie] = useState<any>(null);
+  const [allShowtimes, setAllShowtimes] = useState<any[]>([]);
+  const [availableDates, setAvailableDates] = useState<any[]>([]);
 
-  const dates = ["Hôm nay", "T2", "T3", "T4", "T5", "T6", "T7", "CN"];
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedFormat, setSelectedFormat] = useState("2D");
+  const [selectedShowtime, setSelectedShowtime] = useState<any | null>(null);
+
+  React.useEffect(() => {
+    const fetchMovie = async () => {
+      try {
+        const { default: api } = await import("@/utils/api");
+        if (id) {
+          const response = await api.get(`/movies/${id}`);
+          if (response.data && response.data.data) {
+            setMovie(response.data.data);
+          }
+
+          let items: any[] = [];
+          try {
+            const stRes = await api.get(`/showtimes/movie/${id}`);
+            if (stRes.data && stRes.data.data?.items) {
+               items = stRes.data.data.items;
+            }
+          } catch (stErr: any) {
+            console.log("Phim chưa có lịch chiếu:", stErr?.response?.data?.message || stErr.message);
+            items = [];
+          }
+
+          if (cinemaId) {
+             items = items.filter((x: any) => String(x.cinemaId) === String(cinemaId));
+          }
+          setAllShowtimes(items);
+
+          // Lấy danh sách ngày độc nhất
+          const uniqueDates = Array.from(new Set(items.map((x: any) => x.date)));
+          
+          const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+          const parsedDates = uniqueDates.map(dateStr => {
+              const str = String(dateStr);
+              const parts = str.split('-');
+              let d: Date;
+              if (parts.length === 3) {
+                d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+              } else {
+                d = new Date(str);
+              }
+              const today = new Date();
+              let dayName = dayNames[d.getDay()];
+              if (d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear()) {
+                  dayName = "Hôm nay";
+              }
+              return {
+                  id: dateStr as string,
+                  dayName: dayName,
+                  dateNum: `${d.getDate()}/${d.getMonth() + 1}`,
+                  timeMs: d.getTime(),
+              };
+          });
+          
+          parsedDates.sort((a, b) => a.timeMs - b.timeMs);
+          
+          setAvailableDates(parsedDates);
+          if (parsedDates.length > 0) setSelectedDate(parsedDates[0].id);
+        }
+      } catch (error) {
+        console.log("Fetch movie err in Showtime:", error);
+      }
+    };
+    fetchMovie();
+  }, [id, cinemaId]);
+
   const formats = ["2D", "3D", "IMAX"];
-  const showtimes = [
-    { time: "09:30", status: "available" },
-    { time: "11:45", status: "almost" },
-    { time: "14:00", status: "available" },
-    { time: "16:20", status: "sold" },
-    { time: "18:45", status: "available" },
-    { time: "21:10", status: "available" },
-  ];
+  // Lọc suất chiếu theo ngày và định dạng (nếu API có định dạng)
+  const currentShowtimes = allShowtimes
+    .filter(x => x.date === selectedDate)
+    .sort((a, b) => {
+        // time format HH:mm:ss
+        return a.time.localeCompare(b.time);
+    });
 
   return (
     <View style={styles.container}>
       {/* Header with Progress */}
       <ImageBackground
-        source={{ uri: "https://image.tmdb.org/t/p/original/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg" }}
+        source={{ uri: movie?.posterUrl || "https://image.tmdb.org/t/p/original/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg" }}
         style={styles.headerImageBackground}
       >
         <LinearGradient 
@@ -45,7 +113,7 @@ export default function ShowtimeScreen() {
         />
         <BookingHeader 
            title="Chọn suất chiếu"
-           subtitle="Oppenheimer • CineGo Hà Nội"
+           subtitle={movie ? `${movie.title} • ${cinemaName || "CineGo"}` : "Đang tải..."}
            currentStep={1}
         />
       </ImageBackground>
@@ -53,8 +121,8 @@ export default function ShowtimeScreen() {
       <View style={styles.cinemaInfo}>
         <Ionicons name="location-outline" size={18} color={colors.primary} />
         <View style={{ marginLeft: 8 }}>
-          <Text style={styles.cinemaName}>CineGo Cinema Hà Nội</Text>
-          <Text style={styles.cinemaAddress}>Tầng 5, TTTM Vincom, Ba Đình</Text>
+          <Text style={styles.cinemaName}>{cinemaName || "CineGo Cinema"}</Text>
+          <Text style={styles.cinemaAddress}>{cinemaAddress || "Đang tải địa chỉ..."}</Text>
         </View>
       </View>
 
@@ -67,25 +135,33 @@ export default function ShowtimeScreen() {
           {/* Date */}
           <Text style={styles.sectionTitle}>Chọn ngày</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {dates.map((d) => (
+            {availableDates.length > 0 ? availableDates.map((d) => (
               <TouchableOpacity
-                key={d}
+                key={d.id}
                 style={[
                   styles.datePill,
-                  selectedDate === d && styles.datePillActive,
+                  selectedDate === d.id && styles.datePillActive,
                 ]}
-                onPress={() => setSelectedDate(d)}
+                onPress={() => setSelectedDate(d.id)}
               >
                 <Text
                   style={[
                     styles.dateText,
-                    selectedDate === d && styles.dateTextActive,
+                    selectedDate === d.id && styles.dateTextActive,
                   ]}
                 >
-                  {d}
+                  {d.dayName}
+                </Text>
+                <Text
+                  style={[
+                    styles.dateNumText,
+                    selectedDate === d.id && styles.dateNumTextActive,
+                  ]}
+                >
+                  {d.dateNum}
                 </Text>
               </TouchableOpacity>
-            ))}
+            )) : <Text style={{ color: colors.muted }}>Đang tải lịch chiếu...</Text>}
           </ScrollView>
 
           {/* Format */}
@@ -115,33 +191,41 @@ export default function ShowtimeScreen() {
           {/* Showtime */}
           <Text style={styles.sectionTitle}>Suất chiếu</Text>
           <View style={styles.showtimeGrid}>
-            {showtimes.map((s) => {
+            {currentShowtimes.length > 0 ? currentShowtimes.map((s) => {
               const disabled = s.status === "sold";
+              const timeString = s.time.substring(0, 5); // 09:30:00 -> 09:30
 
               return (
                 <TouchableOpacity
-                  key={s.time}
+                  key={s.id}
                   disabled={disabled}
-                  onPress={() => setSelectedShowtime(s.time)}
+                  onPress={() => setSelectedShowtime(s)}
                   style={[
                     styles.showtimeBtn,
                     s.status === "almost" && styles.showtimeAlmost,
                     disabled && styles.showtimeSold,
-                    selectedShowtime === s.time && styles.showtimeSelected,
+                    selectedShowtime?.id === s.id && styles.showtimeSelected,
                   ]}
                 >
                   <Text
                     style={[
                       styles.showtimeText,
                       disabled && styles.textDisabled,
-                      selectedShowtime === s.time && styles.textSelected,
+                      selectedShowtime?.id === s.id && styles.textSelected,
                     ]}
                   >
-                    {s.time}
+                    {timeString}
                   </Text>
                 </TouchableOpacity>
               );
-            })}
+            }) : (
+              <View style={{ alignItems: "center", justifyContent: "center", width: "100%", paddingVertical: 30 }}>
+                <Ionicons name="calendar-outline" size={40} color={colors.muted} />
+                <Text style={{ color: colors.muted, width: "100%", textAlign: "center", marginTop: 10 }}>
+                  Không có suất chiếu nào vào ngày này.
+                </Text>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>
@@ -155,7 +239,13 @@ export default function ShowtimeScreen() {
             router.push({
               pathname: "/cinema/SeatScreen",
               params: {
-                showtimeId: selectedShowtime!,
+                showtimeId: String(selectedShowtime!.id),
+                movieId: String(id || selectedShowtime!.movieId),
+                cinemaName: cinemaName || selectedShowtime!.cinema_name || "CineGo Cinema",
+                cinemaAddress: cinemaAddress || "",
+                date: selectedShowtime!.date,
+                time: selectedShowtime!.time,
+                format: selectedShowtime!.format,
               },
             })
           }
@@ -211,21 +301,37 @@ const styles = StyleSheet.create({
     paddingTop: 30,
   },
   datePill: {
-    paddingVertical: 10,
+    paddingVertical: 12,
     paddingHorizontal: 16,
-    borderRadius: 20,
+    borderRadius: 14,
     backgroundColor: "#1F2937",
-    marginRight: 8,
+    marginRight: 10,
     marginBottom: 25,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 70,
+    borderWidth: 1,
+    borderColor: "#374151",
   },
   datePillActive: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   dateText: {
     color: "#9CA3AF",
+    fontSize: 12,
     fontWeight: "600",
+    marginBottom: 4,
   },
   dateTextActive: {
+    color: "rgba(255, 255, 255, 0.9)",
+  },
+  dateNumText: {
+    color: "#E5E7EB",
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  dateNumTextActive: {
     color: "#fff",
   },
   formatRow: {

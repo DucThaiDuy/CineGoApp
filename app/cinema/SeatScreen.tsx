@@ -1,7 +1,7 @@
 import BookingHeader from "@/components/BookingHeader";
 import { useLocalSearchParams, useRouter } from "expo-router";
 
-import { useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useMemo } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Animated,
@@ -11,68 +11,140 @@ import {
   Text,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 
 import { colors } from "../../constants/colors";
-import { MOVIES } from "../../constants/movies";
+import api from "@/utils/api";
 
-const rows = [
-  "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O",
-];
-const seatsPerRow = 15;
-
-const soldSeats = ["A5", "B6", "C2"];
-const vipSeats = [
-  "C5", "C6", "C7", "C8", "C9", "C11", "C12", "C13", "C14", "C15",
-  "D5", "D6", "D7", "D8", "D9", "D11", "D12", "D13", "D14", "D15",
-];
-const ways = [
-  "A10", "B10", "C10", "D10", "E10", "F10", "G10", "H10", "I10", "J10", "K10", "L10", "M10", "N10", "O10",
-  "H1", "H2", "H3", "H4", "H5", "H6", "H7", "H8", "H9", "H11", "H12", "H13", "H14", "H15",
-];
+type SeatItem = {
+  id: number;
+  rowName: string;
+  seatNumber: number;
+  seatCode: string;
+  seatType: string;
+  basePrice: number;
+  isBooked: boolean;
+  booked?: boolean;
+};
 
 export default function SeatScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { id } = useLocalSearchParams<{ id: string }>();
-  const movie = MOVIES.find((m) => m.id === id) || MOVIES[0];
+  const { showtimeId, movieId, cinemaName, cinemaAddress, date, time } = useLocalSearchParams<{
+    showtimeId: string;
+    movieId: string;
+    cinemaName: string;
+    cinemaAddress: string;
+    date: string;
+    time: string;
+  }>();
 
-  const [selectedSeats, setSelectedSeats] = useState<string[]>([]);
+  const [movie, setMovie] = useState<any>(null);
+  const [seats, setSeats] = useState<SeatItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedSeatCodes, setSelectedSeatCodes] = useState<string[]>([]);
 
   const scrollX = useRef(new Animated.Value(0)).current;
   const scrollY = useRef(new Animated.Value(0)).current;
 
-  const toggleSeat = (seatId: string) => {
-    if (soldSeats.includes(seatId)) return;
-    if (ways.includes(seatId)) return;
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        if (movieId) {
+          try {
+            const mRes = await api.get(`/movies/${movieId}`);
+            if (mRes.data?.data) {
+              setMovie(mRes.data.data);
+            }
+          } catch (mErr) {
+            console.warn("Lỗi tải thông tin phim:", mErr);
+          }
+        }
 
-    setSelectedSeats((prev) =>
-      prev.includes(seatId)
-        ? prev.filter((s) => s !== seatId)
-        : [...prev, seatId]
+        if (showtimeId) {
+          try {
+            const sRes = await api.get(`/showtimes/${showtimeId}/seats`);
+            const seatList: SeatItem[] = sRes.data?.data || [];
+            setSeats(seatList);
+          } catch (sErr) {
+            console.warn("Lỗi tải danh sách ghế:", sErr);
+            setSeats([]);
+          }
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [showtimeId, movieId]);
+
+  // Nhóm ghế theo hàng
+  const groupedSeats = useMemo(() => {
+    const rowsMap: Record<string, SeatItem[]> = {};
+    seats.forEach((seat) => {
+      const r = seat.rowName;
+      if (!rowsMap[r]) rowsMap[r] = [];
+      rowsMap[r].push(seat);
+    });
+    // Sắp xếp các ghế trong hàng theo seatNumber
+    Object.keys(rowsMap).forEach((r) => {
+      rowsMap[r].sort((a, b) => a.seatNumber - b.seatNumber);
+    });
+    return rowsMap;
+  }, [seats]);
+
+  const rowNames = useMemo(() => {
+    return Object.keys(groupedSeats).sort();
+  }, [groupedSeats]);
+
+  const seatMapByCode = useMemo(() => {
+    const map = new Map<string, SeatItem>();
+    seats.forEach((s) => map.set(s.seatCode, s));
+    return map;
+  }, [seats]);
+
+  const toggleSeat = (seat: SeatItem) => {
+    if (seat.isBooked || seat.booked) return;
+
+    setSelectedSeatCodes((prev) =>
+      prev.includes(seat.seatCode)
+        ? prev.filter((s) => s !== seat.seatCode)
+        : [...prev, seat.seatCode]
     );
   };
+
+  const totalPrice = useMemo(() => {
+    return selectedSeatCodes.reduce((sum, code) => {
+      const seat = seatMapByCode.get(code);
+      return sum + (seat ? Number(seat.basePrice) : 80000);
+    }, 0);
+  }, [selectedSeatCodes, seatMapByCode]);
 
   return (
     <View style={styles.container}>
       {/* Header with Progress & Banner */}
       <ImageBackground
-        source={{ uri: movie.poster.includes('original') ? movie.poster : movie.poster.replace('w500', 'original') }}
+        source={{
+          uri:
+            movie?.posterUrl ||
+            "https://image.tmdb.org/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg",
+        }}
         style={styles.headerImageBackground}
       >
-        <LinearGradient 
-          colors={["rgba(0,0,0,0.8)", "rgba(0,0,0,0.5)", "rgba(10, 10, 10, 1)"]} 
-          style={StyleSheet.absoluteFill} 
+        <LinearGradient
+          colors={["rgba(0,0,0,0.85)", "rgba(0,0,0,0.6)", "rgba(10, 10, 10, 1)"]}
+          style={StyleSheet.absoluteFill}
         />
-        <BookingHeader 
-           title="Chọn ghế"
-           subtitle={`${movie.title} • CineGo Hà Nội`}
-           currentStep={2}
+        <BookingHeader
+          title="Chọn ghế"
+          subtitle={`${movie?.title || "Phim"} • ${cinemaName || "CineGo"}`}
+          currentStep={2}
         />
       </ImageBackground>
-
-
 
       {/* Screen */}
       <View style={styles.screenWrap}>
@@ -80,117 +152,92 @@ export default function SeatScreen() {
         <Text style={styles.screenText}>MÀN HÌNH</Text>
       </View>
 
-      <View style={styles.seatWrapper}>
-        {/* CỘT SỐ GHẾ CỐ ĐỊNH */}
-        {/* <View style={styles.leftColumn}>
-          <View style={styles.leftColumn}>
-            <Animated.View
-              style={{
-                transform: [{ translateY: Animated.multiply(scrollY, -1) }],
-              }}
-            >
-              {Array.from({ length: seatsPerRow }).map((_, i) => (
-                <Text key={i} style={styles.fixedSeatNumber}>
-                  {i + 1}
-                </Text>
-              ))}
-            </Animated.View>
-          </View>
-        </View> */}
-
-        {/* KHU CUỘN */}
-        <View style={{ flex: 1 }}>
-          {/* HEADER CHỮ HÀNG */}
+      {loading ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ color: colors.muted, marginTop: 12 }}>Đang tải sơ đồ phòng chiếu...</Text>
+        </View>
+      ) : seats.length === 0 ? (
+        <View style={{ flex: 1, justifyContent: "center", alignItems: "center", padding: 24 }}>
+          <Text style={{ color: colors.muted, fontSize: 15, textAlign: "center" }}>
+            Không tìm thấy thông tin ghế cho suất chiếu này.
+          </Text>
+        </View>
+      ) : (
+        <View style={styles.seatWrapper}>
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {/* chữ cuộn ngang theo*/}
-            <View style={styles.headerContainer}>
-              <Animated.View
-                style={{
-                  transform: [{ translateX: Animated.multiply(scrollX, -1) }],
-                }}
-              >
-                <View style={styles.headerRow}>
-                  {rows.map((row) => (
-                    <Text key={row} style={styles.headerLetter}>
-                      {row}
-                    </Text>
-                  ))}
-                </View>
-              </Animated.View>
-            </View>
-          </ScrollView>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40, paddingHorizontal: 12 }}>
+              {rowNames.map((rowName) => (
+                <View key={rowName} style={styles.row}>
+                  <Text style={styles.rowLabelText}>{rowName}</Text>
+                  {groupedSeats[rowName].map((seat) => {
+                    const isSold = seat.isBooked || seat.booked;
+                    const isVip = seat.seatType === "VIP";
+                    const isSelected = selectedSeatCodes.includes(seat.seatCode);
 
-          {/* GHẾ */}
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              <View>
-                {Array.from({ length: seatsPerRow }).map((_, seatIndex) => (
-                  <View key={seatIndex} style={styles.row}>
-                    {rows.map((row) => {
-                      const seatId = `${row}${seatIndex + 1}`;
-                      const sold = soldSeats.includes(seatId);
-                      const vip = vipSeats.includes(seatId);
-                      const way = ways.includes(seatId);
-                      const selected = selectedSeats.includes(seatId);
-
-                      return (
-                        <TouchableOpacity
-                          key={seatId}
-                          onPress={() => toggleSeat(seatId)}
+                    return (
+                      <TouchableOpacity
+                        key={seat.seatCode}
+                        disabled={isSold}
+                        onPress={() => toggleSeat(seat)}
+                        style={[
+                          styles.seat,
+                          isVip && styles.seatVip,
+                          isSold && styles.seatSold,
+                          isSelected && styles.seatSelected,
+                        ]}
+                      >
+                        <Text
                           style={[
-                            styles.seat,
-                            vip && styles.seatVip,
-                            sold && styles.seatSold,
-                            way && styles.way,
-                            selected && styles.seatSelected,
+                            styles.seatLabel,
+                            isSold && styles.seatLabelDisabled,
+                            isSelected && { color: "#fff", fontWeight: "bold" },
                           ]}
                         >
-                          {!way && (
-                            <Text
-                              style={[
-                                styles.seatLabel,
-                                sold && styles.seatLabelDisabled,
-                              ]}
-                            >
-                              {seatId}
-                            </Text>
-                          )}
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                ))}
-              </View>
+                          {seat.seatCode}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                  <Text style={styles.rowLabelText}>{rowName}</Text>
+                </View>
+              ))}
             </ScrollView>
           </ScrollView>
         </View>
-      </View>
+      )}
 
       {/* Legend */}
       <View style={styles.legend}>
-        <LegendItem color="#0c0c0eff" label="Lối đi" />
-        <LegendItem color="#374151" label="Trống (20)" />
-        <LegendItem color={colors.primary} label="Đã chọn" />
-        <LegendItem color="#7C2D12" label="Đã bán" />
+        <LegendItem color="#374151" label="Thường" />
         <LegendItem color="#F59E0B" label="VIP" />
+        <LegendItem color={colors.primary} label="Đang chọn" />
+        <LegendItem color="#7C2D12" label="Đã bán" />
       </View>
 
       {/* Bottom */}
       <View style={[styles.bottomBar, { paddingBottom: insets.bottom ? insets.bottom + 12 : 16 }]}>
-        {/* Ghế đã chọn */}
         <Text style={styles.seatText}>
-          Ghế: {selectedSeats.length ? selectedSeats.join(", ") : "Chưa chọn"}
+          Ghế: {selectedSeatCodes.length ? selectedSeatCodes.join(", ") : "Chưa chọn"}
         </Text>
         <Text style={styles.total}>
-          Tổng tiền: {selectedSeats.length * 90000}đ
+          Tổng tiền: {totalPrice.toLocaleString("vi-VN")}đ
         </Text>
         <TouchableOpacity
-          style={[styles.payBtn, !selectedSeats.length && styles.payDisabled]}
-          disabled={!selectedSeats.length}
+          style={[styles.payBtn, !selectedSeatCodes.length && styles.payDisabled]}
+          disabled={!selectedSeatCodes.length}
           onPress={() =>
             router.push({
               pathname: "/cinema/ComboScreen",
-              params: { seats: selectedSeats.join(",") },
+              params: {
+                seats: selectedSeatCodes.join(","),
+                showtimeId: showtimeId || "",
+                movieId: movieId || "",
+                cinemaName: cinemaName || "",
+                totalSeatPrice: String(totalPrice),
+                date: date || "",
+                time: time || "",
+              },
             })
           }
         >
@@ -277,6 +324,14 @@ const styles = StyleSheet.create({
     width: 20,
     color: "#9CA3AF",
     fontWeight: "700",
+  },
+  rowLabelText: {
+    width: 24,
+    textAlign: "center",
+    color: "#9CA3AF",
+    fontSize: 12,
+    fontWeight: "700",
+    lineHeight: 28,
   },
   seatWrapper: {
     flexDirection: "row",

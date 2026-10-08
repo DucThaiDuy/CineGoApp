@@ -13,8 +13,11 @@ import {
   Text,
   TouchableOpacity,
   View,
+  RefreshControl,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Location from "expo-location";
 import CinemaSelector from "../../components/CinemaSelector";
 
 const { width } = Dimensions.get("window");
@@ -23,63 +26,178 @@ export default function MovieDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const movie = MOVIES.find((m) => m.id === id) || MOVIES[0];
-
+  const [movie, setMovie] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [cinemas, setCinemas] = useState<any[]>([]);
   const [selectedCinema, setSelectedCinema] = useState("1");
   const [liked, setLiked] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const cinemas = [
-    {
-      id: "1",
-      name: "CineGo Cinema Hà Nội",
-      address: "Tầng 5, TTTM Vincom, Ba Đình",
-      distance: "2.5 km",
-    },
-    {
-      id: "2",
-      name: "CineGo Cinema Hoàn Kiếm",
-      address: "15 Tràng Thi, Hoàn Kiếm",
-      distance: "3.2 km",
-    },
-    {
-      id: "3",
-      name: "CineGo Cinema Cầu Giấy",
-      address: "234 Cầu Giấy, Cầu Giấy",
-      distance: "4.8 km",
-    },
-  ];
+  const fetchMovie = React.useCallback(async () => {
+    try {
+      // Gọi API public để lấy chi tiết phim
+        const { default: api } = await import("@/utils/api");
+        const response = await api.get('/movies/' + id);
+        if (response.data && response.data.data) {
+          const m = response.data.data;
+          setMovie({
+            id: m.id,
+            title: m.title,
+            originalTitle: m.originalTitle,
+            poster: m.posterUrl,
+            rating: m.rating ? Number(m.rating).toFixed(1) : "N/A",
+            duration: m.durationMinutes ? `${m.durationMinutes} phút` : "Chưa rõ",
+            genre: m.genre || m.category || "Phim chiếu rạp",
+            tag: m.country || "Quốc tế",
+            description: m.description || m.seoDescription || (m.originalTitle ? `${m.title} (${m.originalTitle}) do ${m.distributor || 'hãng phim'} phát hành.` : "Nội dung phim đang được cập nhật."),
+            ageRating: m.ageRating || "T18",
+            status: m.status || "NOW_SHOWING",
+          });
+        }
+
+        // Lấy suất chiếu của phim này từ API
+        let showtimeItems: any[] = [];
+        try {
+          const stRes = await api.get('/showtimes/movie/' + id);
+          showtimeItems = stRes.data?.data?.items || [];
+        } catch (stErr: any) {
+          // Phim chưa có lịch chiếu
+          showtimeItems = [];
+        }
+
+        // Đếm số suất chiếu thật theo từng rạp
+        const showtimesByCinema: Record<string, number> = {};
+        showtimeItems.forEach((s: any) => {
+          if (s.cinemaId) {
+            const cId = String(s.cinemaId);
+            showtimesByCinema[cId] = (showtimesByCinema[cId] || 0) + 1;
+          }
+        });
+        const activeCinemaIds = new Set(Object.keys(showtimesByCinema));
+
+        // Lấy danh sách rạp từ API (luôn hiển thị các rạp thực tế của CineGo từ database)
+        try {
+          const cinemaRes = await api.get('/cinemas');
+          const allCinemas = cinemaRes.data?.data?.items || cinemaRes.data?.items || [];
+          
+          if (allCinemas.length > 0) {
+            const fetchedCinemas = allCinemas
+              .map((c: any) => {
+                const count = showtimesByCinema[String(c.id)] || 0;
+                return {
+                  id: String(c.id),
+                  name: c.name,
+                  address: c.address || `${c.district || ''}, ${c.city || ''}`,
+                  distance: count > 0 ? `${count} suất chiếu` : "Chưa có suất",
+                  hasShowtime: count > 0,
+                  count: count,
+                };
+              })
+              .sort((a: any, b: any) => b.count - a.count);
+
+            setCinemas(fetchedCinemas);
+            if (fetchedCinemas.length > 0) {
+              const firstActive = fetchedCinemas.find((c: any) => c.hasShowtime);
+              setSelectedCinema(firstActive ? firstActive.id : fetchedCinemas[0].id);
+            }
+          } else {
+            setCinemas([]);
+          }
+        } catch (cinErr) {
+          console.warn("Lỗi tải rạp:", cinErr);
+          setCinemas([]);
+        }
+    } catch (error: any) {
+      console.error("Fetch data error:", error?.response?.data || error?.message || error);
+    } finally {
+      setLoading(false);
+    }
+  }, [id]);
+
+  React.useEffect(() => {
+    fetchMovie();
+  }, [fetchMovie]);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchMovie().finally(() => setRefreshing(false));
+  }, [fetchMovie]);
+
+  if (loading) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <Text style={{ color: "#fff" }}>Đang tải thông tin phim...</Text>
+      </View>
+    );
+  }
+
+  if (!movie) {
+    return (
+      <View style={[styles.container, { justifyContent: "center", alignItems: "center" }]}>
+        <Text style={{ color: "#fff" }}>Không tìm thấy thông tin phim.</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
+      {/* Fixed Header Actions (Back & Like Buttons) */}
+      <View style={[styles.headerHUD, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity 
+          style={styles.hudCircle}
+          onPress={() => router.back()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="chevron-back" size={24} color="#fff" />
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.hudCircle, liked && styles.hudCircleLiked]}
+          onPress={() => setLiked(!liked)}
+          activeOpacity={0.7}
+        >
+          <Ionicons 
+            name={liked ? "heart" : "heart-outline"} 
+            size={22} 
+            color={liked ? colors.primary : "#fff"} 
+          />
+        </TouchableOpacity>
+      </View>
+
       <ScrollView 
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={false} 
         contentContainerStyle={{ paddingBottom: 120 }}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressViewOffset={Platform.OS === 'android' ? insets.top + 30 : 0}
+          />
+        }
       >
         {/* Banner Section */}
         <View style={styles.bannerContainer}>
-          <Image
-            source={{ uri: movie.poster }}
-            style={styles.bannerImage}
+          <Image 
+            source={{ uri: movie.poster || "https://image.tmdb.org/t/p/original/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg" }} 
+            style={styles.bannerImage} 
             resizeMode="cover"
           />
           <LinearGradient
-            colors={["transparent", "rgba(10, 10, 10, 0.8)", colors.bg]}
+            colors={["transparent", "rgba(10,10,10,0.8)", colors.bg]}
             style={styles.bannerGradient}
           />
           
           <View style={styles.bannerContent}>
             <View style={styles.tagRow}>
-              {movie.tag && (
-                <View style={styles.tagBadge}>
-                  <Text style={styles.tagText}>{movie.tag}</Text>
-                </View>
-              )}
-              <View style={[styles.tagBadge, { backgroundColor: "rgba(255, 255, 255, 0.2)" }]}>
+              <View style={styles.tagBadge}><Text style={styles.tagText}>{movie.tag || "Mỹ"}</Text></View>
+              <View style={[styles.tagBadge, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
                 <Text style={styles.tagText}>2D / IMAX</Text>
               </View>
             </View>
-
+            
             <Text style={styles.title}>{movie.title}</Text>
             
             <View style={styles.metaRow}>
@@ -93,28 +211,6 @@ export default function MovieDetail() {
               <Text style={styles.metaText}>{movie.genre}</Text>
             </View>
           </View>
-
-          {/* Premium Header Actions */}
-          <View style={[styles.headerHUD, { paddingTop: insets.top + 10 }]}>
-            <TouchableOpacity 
-              style={styles.hudCircle}
-              onPress={() => router.back()}
-            >
-              <Ionicons name="chevron-back" size={24} color="#fff" />
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[styles.hudCircle, liked && styles.hudCircleLiked]}
-              onPress={() => setLiked(!liked)}
-            >
-              <Ionicons 
-                name={liked ? "heart" : "heart-outline"} 
-                size={22} 
-                color={liked ? colors.primary : "#fff"} 
-              />
-            </TouchableOpacity>
-          </View>
-
         </View>
 
         {/* Storyline Section */}
@@ -136,10 +232,10 @@ export default function MovieDetail() {
           </TouchableOpacity>
         </View>
 
-        {/* Cast/Crew placeholders (Optional highlight) */}
+        {/* Movie Metrics */}
         <View style={styles.metricsRow}>
           <View style={styles.metricItem}>
-            <Text style={styles.metricValue}>T18</Text>
+            <Text style={styles.metricValue}>{movie.ageRating || "T18"}</Text>
             <Text style={styles.metricLabel}>Độ tuổi</Text>
           </View>
           <View style={styles.metricDivider} />
@@ -149,7 +245,7 @@ export default function MovieDetail() {
           </View>
           <View style={styles.metricDivider} />
           <View style={styles.metricItem}>
-            <Text style={styles.metricValue}>4.5/5</Text>
+            <Text style={styles.metricValue}>{movie.rating !== "N/A" ? `${movie.rating}/10` : "Chưa có"}</Text>
             <Text style={styles.metricLabel}>CineScore</Text>
           </View>
         </View>
@@ -158,29 +254,45 @@ export default function MovieDetail() {
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <View style={styles.sectionIndicator} />
-            <Text style={styles.sectionTitle}>Chọn rạp chiếu</Text>
+            <Text style={styles.sectionTitle}>Rạp đang chiếu phim này</Text>
           </View>
           
           <CinemaSelector
-            cinemas={cinemas}
-            selectedCinema={selectedCinema}
-            onSelect={setSelectedCinema}
-          />
+              cinemas={cinemas}
+              selectedCinema={selectedCinema}
+              movieId={id}
+              onSelect={setSelectedCinema}
+            />
         </View>
       </ScrollView>
 
       {/* Booking Bar */}
       <View style={[styles.bookingBar, { paddingBottom: insets.bottom + 16 }]}>
         <TouchableOpacity
-          style={styles.bookBtn}
-          onPress={() => router.push({ pathname: "/cinema/ShowtimeScreen", params: { id: movie.id } })}
+          style={[styles.bookBtn, cinemas.length === 0 && { opacity: 0.6 }]}
+          disabled={cinemas.length === 0}
+          onPress={() => {
+            const c = cinemas.find((x) => x.id === selectedCinema) || cinemas[0];
+            if (!c) return;
+            router.push({ 
+              pathname: "/cinema/ShowtimeScreen", 
+              params: { 
+                id: movie.id, 
+                cinemaId: c.id,
+                cinemaName: c.name,
+                cinemaAddress: c.address
+              } 
+            });
+          }}
         >
           <LinearGradient
-            colors={[colors.primary, "#B91C1C"]}
+            colors={cinemas.length > 0 ? [colors.primary, "#B91C1C"] : ["#374151", "#1F2937"]}
             style={styles.btnGradient}
           >
-            <Text style={styles.bookBtnText}>ĐẶT VÉ NGAY</Text>
-            <Ionicons name="ticket-outline" size={20} color="#fff" />
+            <Text style={styles.bookBtnText}>
+              {cinemas.length > 0 ? "ĐẶT VÉ NGAY" : "CHƯA CÓ LỊCH CHIẾU"}
+            </Text>
+            {cinemas.length > 0 && <Ionicons name="ticket-outline" size={20} color="#fff" />}
           </LinearGradient>
         </TouchableOpacity>
       </View>
@@ -270,26 +382,28 @@ const styles = StyleSheet.create({
   },
   headerHUD: {
     position: "absolute",
+    top: 0,
     left: 0,
     right: 0,
     flexDirection: "row",
     justifyContent: "space-between",
     paddingHorizontal: 20,
     alignItems: "center",
+    zIndex: 99,
   },
   hudCircle: {
     width: 44,
     height: 44,
     borderRadius: 14,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: "rgba(255, 255, 255, 0.1)",
+    borderColor: "rgba(255, 255, 255, 0.15)",
   },
   hudCircleLiked: {
     borderColor: colors.primary,
-    backgroundColor: "rgba(229, 9, 20, 0.15)",
+    backgroundColor: "rgba(229, 9, 20, 0.3)",
   },
   section: {
     paddingHorizontal: 20,
