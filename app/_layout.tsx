@@ -1,6 +1,6 @@
 import { theme } from "@/constants/colors";
-import { DefaultTheme, DarkTheme, ThemeProvider } from "@react-navigation/native";
 import { Stack } from "expo-router";
+import { DefaultTheme, DarkTheme, ThemeProvider } from "expo-router/react-navigation";
 import { StatusBar } from "expo-status-bar";
 import { View } from "react-native";
 import "react-native-reanimated";
@@ -55,7 +55,7 @@ function RootContent() {
   return (
     <View style={{ flex: 1, backgroundColor: isDark ? theme.dark.bg : theme.light.bg }}>
       {/* StatusBar duy nhất */}
-      <StatusBar style={isDark ? "light" : "dark"} translucent />
+      <StatusBar style={isDark ? "light" : "dark"} />
 
       {/* Nội dung chính */}
       <View style={{ flex: 1, backgroundColor: isDark ? theme.dark.bg : theme.light.bg }}>
