@@ -11,44 +11,53 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useRouter } from "expo-router";
+import api from "@/utils/api";
 
 const { width } = Dimensions.get("window");
 
-const BANNER_MOVIES = [
-  {
-    id: 1,
-    title: "Avengers: Endgame",
-    meta: "Action • Sci-Fi • 181m",
-    image: "https://image.tmdb.org/t/p/w780/8pjWz2lt29KyVGoq1mXYu6Br7dE.jpg",
-    rating: "4.9",
-    tag: "NOW PLAYING",
-  },
-  {
-    id: 2,
-    title: "Dune: Part Two",
-    meta: "Action • Sci-Fi • 166m",
-    image: "https://image.tmdb.org/t/p/w780/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-    rating: "4.8",
-    tag: "BEST SELLER",
-  },
-  {
-    id: 3,
-    title: "Oppenheimer",
-    meta: "Drama • History • 180m",
-    image: "https://image.tmdb.org/t/p/w780/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
-    rating: "4.9",
-    tag: "MUST WATCH",
-  },
-];
-
 export default function HeroBanner() {
+  const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
   const flatListRef = useRef<FlatList>(null);
+  const [bannerMovies, setBannerMovies] = useState<any[]>([]);
 
   useEffect(() => {
+    const fetchBanners = async () => {
+      try {
+        const response = await api.get("/movies", {
+          params: { page: 0, size: 10 },
+        });
+        const items = response.data?.data?.items || response.data?.items || [];
+        if (items.length > 0) {
+          const featured = items
+            .filter((m: any) => m.isFeatured || m.status === "NOW_SHOWING")
+            .slice(0, 5)
+            .map((m: any) => ({
+              id: m.id,
+              title: m.title,
+              meta: `${m.country || "Quốc tế"} • ${m.ageRating || "T16"} • ${m.durationMinutes ? m.durationMinutes + "m" : "120m"}`,
+              image: m.posterUrl || "https://image.tmdb.org/t/p/w780/8pjWz2lt29KyVGoq1mXYu6Br7dE.jpg",
+              rating: m.rating ? Number(m.rating).toFixed(1) : "8.9",
+              tag: m.isFeatured ? "HOT" : "ĐANG CHIẾU",
+            }));
+          if (featured.length > 0) {
+            setBannerMovies(featured);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn("Lỗi tải banner movies:", err);
+      }
+    };
+    fetchBanners();
+  }, []);
+
+  useEffect(() => {
+    if (bannerMovies.length <= 1) return;
     const interval = setInterval(() => {
       let nextIndex = activeIndex + 1;
-      if (nextIndex >= BANNER_MOVIES.length) {
+      if (nextIndex >= bannerMovies.length) {
         nextIndex = 0;
       }
       setActiveIndex(nextIndex);
@@ -56,12 +65,12 @@ export default function HeroBanner() {
         index: nextIndex,
         animated: true,
       });
-    }, 30000); 
+    }, 8000); 
 
     return () => clearInterval(interval);
-  }, [activeIndex]);
+  }, [activeIndex, bannerMovies.length]);
 
-  const renderItem = ({ item }: { item: typeof BANNER_MOVIES[0] }) => (
+  const renderItem = ({ item }: { item: any }) => (
     <View style={styles.bannerItem}>
       <ImageBackground source={{ uri: item.image }} style={styles.banner} resizeMode="cover">
         <LinearGradient
@@ -82,7 +91,10 @@ export default function HeroBanner() {
             <Text style={styles.title} numberOfLines={2}>{item.title}</Text>
             <Text style={styles.metaText}>{item.meta}</Text>
 
-            <TouchableOpacity style={styles.bookBtn}>
+            <TouchableOpacity 
+              style={styles.bookBtn}
+              onPress={() => router.push({ pathname: "/movie/MovieDetail", params: { id: item.id } })}
+            >
               <LinearGradient 
                 colors={[colors.primary, "#8B0000"]}
                 start={{ x: 0, y: 0 }}
@@ -99,11 +111,15 @@ export default function HeroBanner() {
     </View>
   );
 
+  if (bannerMovies.length === 0) {
+    return null;
+  }
+
   return (
     <View style={styles.container}>
       <FlatList
         ref={flatListRef}
-        data={BANNER_MOVIES}
+        data={bannerMovies}
         renderItem={renderItem}
         horizontal
         pagingEnabled
@@ -116,7 +132,7 @@ export default function HeroBanner() {
       />
 
       <View style={styles.pagination}>
-        {BANNER_MOVIES.map((_, index) => (
+        {bannerMovies.map((_, index) => (
           <View
             key={index}
             style={[
@@ -144,7 +160,7 @@ const styles = StyleSheet.create({
     width: "100%",
   },
   overlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "flex-end",
     padding: 24,
     paddingBottom: 40,

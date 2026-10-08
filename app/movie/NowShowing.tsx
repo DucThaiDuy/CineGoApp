@@ -3,7 +3,7 @@ import { colors } from "@/constants/colors";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -14,8 +14,10 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  RefreshControl,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import api from "@/utils/api";
 
 const { width } = Dimensions.get("window");
 
@@ -27,24 +29,49 @@ type Movie = {
   rating: string;
 };
 
-const moviesData: Movie[] = [
-  { id: "1", title: "Avengers: Endgame", genre: "Hành động", rating: "4.9", poster: "https://image.tmdb.org/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg" },
-  { id: "2", title: "The Batman", genre: "Hành động", rating: "4.8", poster: "https://image.tmdb.org/t/p/w500/74xTEgt7R36Fpooo50r9T25onhq.jpg" },
-  { id: "3", title: "Iron Man 3", genre: "Hành động", rating: "4.7", poster: "https://afamilycdn.com/k:thumb_w/600/Tnk9vRlUgEMOa9xiFyoQdi0bvg9Omj/Image/2013/05/iron-man-3-poster-364ac/iron-man-3-cau-chuyen-dang-sau-bo-giap-sat-.jpg" },
-  { id: "4", title: "La La Land", genre: "Lãng mạn", rating: "4.6", poster: "https://mir-s3-cdn-cf.behance.net/project_modules/1400/8096ba232709307.68a2155f7877f.jpg" },
-  { id: "5", title: "Deadpool", genre: "Hài hước", rating: "4.5", poster: "https://youthvietnam.vn/wp-content/uploads/2021/06/Cac-yeu-to-giup-poster-phim-thanh-cong.jpg" },
-  { id: "6", title: "Inception", genre: "Viễn tưởng", rating: "4.9", poster: "https://wallpaperaccess.com/full/645297.jpg" },
-  { id: "7", title: "Guardians of the Galaxy", genre: "Hành động", rating: "4.7", poster: "https://booking.bhdstar.vn/CDN/Image/Entity/FilmPosterGraphic/HO00003226" },
-  { id: "8", title: "Titanic", genre: "Lãng mạn", rating: "4.9", poster: "https://cdn2.fptshop.com.vn/unsafe/Uploads/images/tin-tuc/176627/Originals/poster-phim-hoat-hinh-1.jpg" },
-  { id: "9", title: "Joker", genre: "Tâm lý", rating: "4.8", poster: "https://cdn-www.vinid.net/3f44f821-phim-hoat-hinh-chieu-rap-7.jpg" },
-];
-
 const genres = ["Hành động", "Lãng mạn", "Hài hước", "Viễn tưởng", "Tâm lý"];
 
 export default function NowShowing() {
   const insets = useSafeAreaInsets();
+  const [moviesData, setMoviesData] = useState<Movie[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null);
+
+  const fetchMovies = async () => {
+    try {
+      const response = await api.get("/movies", {
+        params: { page: 0, size: 50 },
+      });
+      const items = response.data?.data?.items || response.data?.items || [];
+      if (items.length > 0) {
+        const mapped = items
+          .filter((m: any) => m.status === "NOW_SHOWING" || !m.status)
+          .map((m: any) => ({
+            id: String(m.id),
+            title: m.title,
+            genre: m.country || "Hành động",
+            poster: m.posterUrl || "https://image.tmdb.org/t/p/w500/or06FN3Dka5tukK1e9sl16pB3iy.jpg",
+            rating: m.rating ? Number(m.rating).toFixed(1) : "8.8",
+          }));
+        setMoviesData(mapped);
+      }
+    } catch (err) {
+      console.warn("Lỗi tải phim đang chiếu:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchMovies();
+  }, []);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchMovies().finally(() => setRefreshing(false));
+  };
 
   const filteredMovies = moviesData.filter((movie) => {
     const matchesSearch = movie.title.toLowerCase().includes(searchText.toLowerCase());
@@ -56,8 +83,6 @@ export default function NowShowing() {
 
   const renderHeader = () => (
     <View style={styles.headerWrapper}>
-      <SubHeader title="Phim đang chiếu" />
-      
       {/* Hero Banner HUD */}
       <View style={styles.heroContainer}>
         <Image
@@ -116,6 +141,8 @@ export default function NowShowing() {
         style={styles.ambientMesh} 
       />
 
+      <SubHeader title="Phim đang chiếu" />
+
       <FlatList
         data={filteredMovies}
         ListHeaderComponent={renderHeader}
@@ -138,7 +165,7 @@ export default function NowShowing() {
             
             <View style={styles.ratingBadge}>
               <Ionicons name="star" size={12} color={colors.accent} />
-              <精密Text style={styles.ratingValue}>{item.rating}</精密Text>
+              <Text style={styles.ratingValue}>{item.rating}</Text>
             </View>
 
             <View style={styles.cardInfo}>
@@ -147,6 +174,14 @@ export default function NowShowing() {
             </View>
           </TouchableOpacity>
         )}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       />
     </View>
   );

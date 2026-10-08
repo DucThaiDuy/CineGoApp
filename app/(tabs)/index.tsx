@@ -10,8 +10,9 @@ import { useAppColors } from "@/hooks/use-app-colors";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import React from "react";
-import { ScrollView, StyleSheet, View, Text, Dimensions } from "react-native";
+import React, { useEffect, useState } from "react";
+import { ScrollView, StyleSheet, View, Text, Dimensions, RefreshControl, Platform } from "react-native";
+import api from "@/utils/api";
 import { LinearGradient } from "expo-linear-gradient";
 
 const { width } = Dimensions.get("window");
@@ -48,7 +49,7 @@ export default function Home() {
       opacity: 0.05,
     },
     heroWrapper: {
-      marginTop: -20, // Negative margin to blend with header
+      marginTop: 0,
       zIndex: 1,
     },
     mainContent: {
@@ -79,51 +80,60 @@ export default function Home() {
     },
   });
 
-  const moviesNow = [
-    {
-      id: 10,
-      title: "Oppenheimer",
-      poster: "https://image.tmdb.org/t/p/w500/8Gxv8gSFCU0XGDykEGv7zR1n2ua.jpg",
-    },
-    {
-      id: 11,
-      title: "Dune: Part Two",
-      poster: "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-    },
-    {
-      id: 12,
-      title: "Detective Conan",
-      poster: "https://assetscdn1.paytm.com/images/cinema/_DETECTIVE-CONAN---Gallery-e2363970-8161-11ef-9b0f-4fef860dce54.jpg",
-    },
-    {
-      id: 13,
-      title: "Avengers",
-      poster: "https://revelogue.com/wp-content/uploads/2020/01/Poster-chinh-thuc-cho-Endgame-e1578281933829.jpg",
-    },
-  ];
+  const [moviesNow, setMoviesNow] = useState<any[]>([]);
 
-  const moviesComing = [
-    {
-      id: 1,
-      title: "Deadpool 1",
-      poster: "https://image.tmdb.org/t/p/w500/qW4crfED8mpNDadSmMdi7ZDzhXF.jpg",
-    },
-    {
-      id: 2,
-      title: "Deadpool 2",
-      poster: "https://image.tmdb.org/t/p/w500/1pdfLvkbY9ohJlCjQH2CZjjYVvJ.jpg",
-    },
-    {
-      id: 3,
-      title: "Deadpool 3",
-      poster: "https://image.tmdb.org/t/p/w500/qW4crfED8mpNDadSmMdi7ZDzhXF.jpg",
-    },
-    {
-      id: 4,
-      title: "Deadpool 4",
-      poster: "https://image.tmdb.org/t/p/w500/qW4crfED8mpNDadSmMdi7ZDzhXF.jpg",
-    },
-  ];
+  const [moviesComing, setMoviesComing] = useState<any[]>([]);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchMovies = async () => {
+    try {
+      const response = await api.get("/movies", {
+        params: { page: 0, size: 20 },
+      });
+      
+      let moviesList: any[] = [];
+      if (response.data && response.data.data && Array.isArray(response.data.data.items)) {
+        moviesList = response.data.data.items;
+      } else if (response.data && Array.isArray(response.data.items)) {
+        moviesList = response.data.items;
+      } else if (response.data && Array.isArray(response.data.data)) {
+        moviesList = response.data.data;
+      } else if (Array.isArray(response.data)) {
+        moviesList = response.data;
+      }
+
+      if (moviesList.length > 0) {
+        const nowShowing = moviesList
+          .filter((m: any) => m.status === "NOW_SHOWING")
+          .map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            poster: m.posterUrl,
+          }));
+        const comingSoon = moviesList
+          .filter((m: any) => m.status === "COMING_SOON")
+          .map((m: any) => ({
+            id: m.id,
+            title: m.title,
+            poster: m.posterUrl,
+          }));
+
+        if (nowShowing.length > 0) setMoviesNow(nowShowing);
+        if (comingSoon.length > 0) setMoviesComing(comingSoon);
+      }
+    } catch (error) {
+      console.error("Fetch movies error:", error);
+    }
+  };
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    fetchMovies().finally(() => setRefreshing(false));
+  }, []);
+
+  useEffect(() => {
+    fetchMovies();
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -133,13 +143,21 @@ export default function Home() {
       <View style={styles.blurBlob1} />
       <View style={styles.blurBlob2} />
 
+      <HomeHeader />
+
       <ScrollView 
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[0]}
         contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressViewOffset={Platform.OS === "android" ? 20 : 0}
+          />
+        }
       >
-        <HomeHeader />
-        
         <View style={styles.heroWrapper}>
           <HeroBanner />
         </View>
