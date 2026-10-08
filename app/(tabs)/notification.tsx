@@ -9,6 +9,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  RefreshControl,
+  Platform,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -68,6 +70,12 @@ const mockNotifications: NotificationItem[] = [
 export default function NotificationScreen() {
   const [filter, setFilter] = useState<"all" | NotificationType>("all");
   const insets = useSafeAreaInsets();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 800);
+  }, []);
 
 
   const filteredData = useMemo(() => {
@@ -150,6 +158,15 @@ export default function NotificationScreen() {
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={colors.primary} 
+            colors={[colors.primary]}
+            progressViewOffset={Platform.OS === "android" ? 20 : 0}
+          />
+        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <MaterialCommunityIcons name="bell-off-outline" size={80} color={colors.muted} />

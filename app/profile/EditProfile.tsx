@@ -21,6 +21,30 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
+const InputField = ({ 
+  label, 
+  value, 
+  onChangeText, 
+  icon, 
+  placeholder, 
+  keyboardType = "default" 
+}: any) => (
+  <View style={styles.inputContainer}>
+    <Text style={styles.inputLabel}>{label}</Text>
+    <View style={styles.inputWrapper}>
+      <Ionicons name={icon} size={20} color={colors.primary} style={styles.inputIcon} />
+      <TextInput
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor={colors.muted}
+        keyboardType={keyboardType}
+        style={styles.input}
+      />
+    </View>
+  </View>
+);
+
 export default function EditProfile() {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState("Thái Đức");
@@ -28,35 +52,16 @@ export default function EditProfile() {
   const [phone, setPhone] = useState("0987 654 321");
   const [birthday, setBirthday] = useState("01/01/2000");
 
-  const InputField = ({ 
-    label, 
-    value, 
-    onChangeText, 
-    icon, 
-    placeholder, 
-    keyboardType = "default" 
-  }: any) => (
-    <View style={styles.inputContainer}>
-      <Text style={styles.inputLabel}>{label}</Text>
-      <View style={styles.inputWrapper}>
-        <Ionicons name={icon} size={20} color={colors.primary} style={styles.inputIcon} />
-        <TextInput
-          value={value}
-          onChangeText={onChangeText}
-          placeholder={placeholder}
-          placeholderTextColor={colors.muted}
-          keyboardType={keyboardType}
-          style={styles.input}
-        />
-      </View>
-    </View>
-  );
-
   return (
     <View style={styles.container}>
       {/* Ambient Background Glows */}
       <View style={styles.blurBlobTop} />
       <View style={styles.blurBlobBottom} />
+
+      <SubHeader 
+        title="Chỉnh sửa hồ sơ"
+        subtitle="Cập nhật thông tin cá nhân của bạn"
+      />
 
       <KeyboardAvoidingView 
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -66,12 +71,7 @@ export default function EditProfile() {
            showsVerticalScrollIndicator={false}
            contentContainerStyle={{ paddingBottom: 100 }}
         >
-          <SubHeader 
-            title="Chỉnh sửa hồ sơ"
-            subtitle="Cập nhật thông tin cá nhân của bạn"
-          />
-
-          <View style={{ height: 20 }} />
+          <View style={{ height: 10 }} />
 
           {/* Avatar Edit Section */}
           <View style={styles.avatarSection}>

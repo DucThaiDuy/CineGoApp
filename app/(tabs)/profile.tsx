@@ -12,6 +12,8 @@ import {
   Text,
   TouchableOpacity,
   View,
+  RefreshControl,
+  Platform,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -24,6 +26,12 @@ export default function Profile() {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [darkMode, setDarkMode] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState("vi");
+  const [refreshing, setRefreshing] = useState(false);
+
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    setTimeout(() => setRefreshing(false), 800);
+  }, []);
 
   const languages = [
     { code: "vi", label: "Tiếng Việt", flag: "https://flagcdn.com/w20/vn.png" },
@@ -113,6 +121,15 @@ export default function Profile() {
         data={[]}
         renderItem={null}
         contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={colors.primary} 
+            colors={[colors.primary]}
+            progressViewOffset={Platform.OS === "android" ? 20 : 0}
+          />
+        }
         ListFooterComponent={
           <View style={styles.menuContainer}>
             {/* Account Section */}

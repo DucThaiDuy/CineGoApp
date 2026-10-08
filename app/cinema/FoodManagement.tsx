@@ -87,17 +87,17 @@ export default function FoodManagement() {
     <View style={styles.container}>
       {/* Background Decorative Blurs */}
       <View style={styles.blurBlob} />
+
+      <SubHeader 
+         title="Bắp & Nước"
+         subtitle="Thêm vị cho buổi xem phim hoàn hảo"
+      />
       
       <ScrollView 
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: 140 }}
       >
-        <SubHeader 
-           title="Bắp & Nước"
-           subtitle="Thêm vị cho buổi xem phim hoàn hảo"
-        />
-
-        <View style={{ height: 20 }} />
+        <View style={{ height: 10 }} />
 
         {/* Search HUD */}
         <View style={styles.searchContainer}>

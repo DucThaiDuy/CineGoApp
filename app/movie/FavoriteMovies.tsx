@@ -28,24 +28,20 @@ export default function FavoriteMovies() {
     setFavorites(favorites.filter(m => m.id !== id));
   };
 
-  const renderHeader = () => (
-    <SubHeader 
-      title="Phim yêu thích"
-      subtitle="Danh sách phim bạn đã quan tâm"
-    />
-  );
-
-
   return (
     <View style={styles.container}>
       <LinearGradient
         colors={["rgba(229, 9, 20, 0.15)", "transparent"]}
         style={styles.backgroundGlow}
       />
+
+      <SubHeader 
+        title="Phim yêu thích"
+        subtitle="Danh sách phim bạn đã quan tâm"
+      />
       
       <FlatList
         data={favorites}
-        ListHeaderComponent={renderHeader}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 40 }]}
         ListEmptyComponent={

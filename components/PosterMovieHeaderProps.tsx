@@ -67,7 +67,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 24,
   },
   headerOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   backButton: {
     position: "absolute",

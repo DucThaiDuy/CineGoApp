@@ -193,7 +193,7 @@ export default function ReviewList() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   background: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
   },
   titleBar: {
     flexDirection: "row",
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     resizeMode: "cover",
   },
   heroOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "flex-end",
     padding: 20,
   },

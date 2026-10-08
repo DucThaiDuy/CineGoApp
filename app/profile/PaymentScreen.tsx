@@ -30,11 +30,12 @@ export default function PaymentScreen() {
 
   return (
     <View style={styles.container}>
+      <SubHeader title="Thanh toán" />
+
       <ScrollView 
         contentContainerStyle={{ paddingBottom: 60 }}
         showsVerticalScrollIndicator={false}
       >
-        <SubHeader title="Thanh toán" />
 
         <View style={styles.header}>
           <LinearGradient

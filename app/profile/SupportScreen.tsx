@@ -26,14 +26,15 @@ export default function SupportScreen() {
 
   return (
     <View style={styles.container}>
+      <SubHeader 
+         title="Hỗ trợ"
+         subtitle="Chúng tôi có thể giúp gì cho bạn?"
+      />
+
       <ScrollView 
         contentContainerStyle={{ paddingBottom: 60 }}
         showsVerticalScrollIndicator={false}
       >
-        <SubHeader 
-           title="Hỗ trợ"
-           subtitle="Chúng tôi có thể giúp gì cho bạn?"
-        />
 
         <View style={styles.searchSection}>
           <View style={styles.searchBar}>

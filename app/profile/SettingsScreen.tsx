@@ -20,16 +20,16 @@ export default function SettingsScreen() {
 
   return (
     <View style={styles.container}>
+      <SubHeader 
+         title="Cài đặt"
+         subtitle="Tùy chỉnh trải nghiệm CineGo của bạn"
+      />
+
       <ScrollView 
         contentContainerStyle={{ paddingBottom: 60 }}
         showsVerticalScrollIndicator={false}
       >
-        <SubHeader 
-           title="Cài đặt"
-           subtitle="Tùy chỉnh trải nghiệm CineGo của bạn"
-        />
-
-        <View style={{ height: 20 }} />
+        <View style={{ height: 10 }} />
 
         <View style={styles.content}>
           {/* Account Section */}

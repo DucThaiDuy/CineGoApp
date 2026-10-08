@@ -12,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 /* ================= TYPES ================= */
 type PromotionStatus = "active" | "upcoming" | "expired";
@@ -103,22 +104,24 @@ export default function PromotionsScreen() {
   }, [activeTab, search, list]);
 
   const savedPromos = list.filter((p) => p.saved);
+  const insets = useSafeAreaInsets();
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
       {/* HEADER */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backBtn} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={24} color="#fff" />
         </TouchableOpacity>
         <Text style={styles.title}>🎉 Sự kiện & Khuyến mãi</Text>
         <Text style={styles.subtitle}>Ưu đãi độc quyền dành cho bạn</Text>
       </View>
 
-      {/* SEARCH */}
-      <View style={styles.searchBox}>
-        <Ionicons name="search-outline" size={18} color={colors.muted} />
-        <TextInput
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 60 }}>
+        {/* SEARCH */}
+        <View style={styles.searchBox}>
+          <Ionicons name="search-outline" size={18} color={colors.muted} />
+          <TextInput
           placeholder="Tìm khuyến mãi, sự kiện..."
           placeholderTextColor={colors.muted}
           style={styles.searchInput}
@@ -176,7 +179,8 @@ export default function PromotionsScreen() {
           scrollEnabled={false}
         />
       )}
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 }
 
@@ -243,8 +247,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   header: {
-    marginTop: 50,
-    marginBottom: 10,
+    paddingBottom: 10,
   },
   backBtn: {
     width: 36,

@@ -1,3 +1,5 @@
+import 'text-encoding';
+import { Client } from '@stomp/stompjs';
 import { colors } from "@/constants/colors";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { Image as ExpoImage } from "expo-image";
@@ -14,6 +16,8 @@ import {
   View,
   Dimensions,
   ScrollView,
+  RefreshControl,
+  Platform,
 } from "react-native";
 import QRCode from "react-native-qrcode-svg";
 import Animated, { FadeInDown, FadeInRight, Layout } from "react-native-reanimated";
@@ -77,10 +81,10 @@ export default function MyTicket() {
   const [searchText, setSearchText] = useState("");
   const insets = useSafeAreaInsets();
 
-  // Load and sync tickets
-  React.useEffect(() => {
-    const loadTickets = async () => {
-      // 1. Try to load from offline first
+  const [refreshing, setRefreshing] = useState(false);
+
+  const loadTickets = React.useCallback(async () => {
+    // 1. Try to load from offline first
       const offlineData = await getOfflineTickets();
       if (offlineData.length > 0) {
         setTickets(offlineData);
@@ -134,10 +138,48 @@ export default function MyTicket() {
           position: "bottom",
         });
       }
-    };
+    }, []);
 
+  const onRefresh = React.useCallback(() => {
+    setRefreshing(true);
+    loadTickets().finally(() => setRefreshing(false));
+  }, [loadTickets]);
+
+  React.useEffect(() => {
     loadTickets();
-  }, []);
+
+    const client = new Client({
+      brokerURL: 'ws://192.168.0.4:8080/ws',
+      reconnectDelay: 5000,
+      onConnect: () => {
+        console.log("STOMP WebSocket Connected!");
+        // Theo dõi topic đặt vé mới từ Backend
+        client.subscribe('/topic/bookings', (message) => {
+          console.log("New booking received via WS:", message.body);
+          // Tự động load lại danh sách vé ngay lập tức
+          loadTickets();
+          Toast.show({
+            type: "success",
+            text1: "Cập nhật mới",
+            text2: "Danh sách vé vừa được đồng bộ!",
+            position: "top",
+          });
+        });
+      },
+      onWebSocketError: (error) => {
+         console.error("WS Error:", error);
+      },
+      onStompError: (frame) => {
+        console.error('Broker error:', frame.headers['message']);
+      },
+    });
+
+    client.activate();
+
+    return () => {
+      client.deactivate();
+    };
+  }, [loadTickets]);
 
 
 
@@ -261,32 +303,43 @@ export default function MyTicket() {
         />
       </View>
 
-      {filteredTickets.length > 0 ? (
-        <FlatList
-          data={filteredTickets}
-          keyExtractor={(item) => item.id}
-          renderItem={renderTicketItem}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <Animated.View entering={FadeInDown} style={styles.emptyContainer}>
-          <View style={styles.emptyIconCircle}>
-            <MaterialCommunityIcons
-              name="ticket-confirmation-outline"
-              size={100}
-              color={colors.muted}
-            />
-          </View>
-          <Text style={styles.emptyTitle}>Chưa có vé nào</Text>
-          <Text style={styles.emptySubtitle}>
-            Hãy chọn một bộ phim yêu thích và đặt vé ngay nhé!
-          </Text>
-          <TouchableOpacity style={styles.bookNowBtn}>
-            <Text style={styles.bookNowBtnText}>Đặt vé ngay</Text>
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+      <FlatList
+        data={filteredTickets}
+        keyExtractor={(item) => item.id}
+        renderItem={renderTicketItem}
+        contentContainerStyle={[
+          styles.listContent,
+          filteredTickets.length === 0 && { flexGrow: 1, justifyContent: "center" },
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl 
+            refreshing={refreshing} 
+            onRefresh={onRefresh} 
+            tintColor={colors.primary} 
+            colors={[colors.primary]}
+            progressViewOffset={Platform.OS === "android" ? 20 : 0}
+          />
+        }
+        ListEmptyComponent={
+          <Animated.View entering={FadeInDown} style={styles.emptyContainer}>
+            <View style={styles.emptyIconCircle}>
+              <MaterialCommunityIcons
+                name="ticket-confirmation-outline"
+                size={100}
+                color={colors.muted}
+              />
+            </View>
+            <Text style={styles.emptyTitle}>Chưa có vé nào</Text>
+            <Text style={styles.emptySubtitle}>
+              Hãy chọn một bộ phim yêu thích và đặt vé ngay nhé!
+            </Text>
+            <TouchableOpacity style={styles.bookNowBtn} onPress={() => router.push("/(tabs)")}>
+              <Text style={styles.bookNowBtnText}>Đặt vé ngay</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        }
+      />
 
       {/* Detail Modal */}
       {selectedTicket && (
@@ -616,7 +669,7 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   posterOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -777,7 +830,7 @@ const styles = StyleSheet.create({
     width: width - 40,
   },
   zoomedQRContainer: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     backgroundColor: "rgba(0,0,0,0.95)",
     justifyContent: "center",
     alignItems: "center",
